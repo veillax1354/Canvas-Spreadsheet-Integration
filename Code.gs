@@ -43,9 +43,22 @@ __main(options, spreadsheet, namespace);
 function __main(options, spreadsheet, namespace) {
   spreadsheet.toast("", "Refreshing Data...")
   var overviewSheet = spreadsheet.getSheetByName("Overview");
-
+  var sheet1 = spreadsheet.getSheetByName("Sheet1");
+  
+  if (sheet1) {
+    spreadsheet.deleteSheet(sheet1)
+  }
+  if (overviewSheet) {
+    spreadsheet.deleteSheet(overviewSheet)
+    spreadsheet.insertSheet("Overview")
+    overviewSheet = spreadsheet.getSheetByName("Overview");
+  } else if (!overviewSheet) {
+    spreadsheet.insertSheet("Overview")
+    overviewSheet = spreadsheet.getSheetByName("Overview");
+  }
+  try{
   overviewSheet.getRange("A:F").clear()
-
+  } catch {}
   // Apply background colors
   var headerRange = overviewSheet.getRange("1:1");
   var completeRange = overviewSheet.getRange("B:B");
@@ -72,7 +85,7 @@ function __main(options, spreadsheet, namespace) {
   var totalRows = 2;
   var rowIndex = 2;
 
-  var url = "https://" + namespace + "/api/v1/courses"
+  var url = "https://" + namespace + ".instructure.com/api/v1/courses"
 
   // Make the request and log the response
   var response = UrlFetchApp.fetch(url, options);
@@ -97,7 +110,9 @@ function __main(options, spreadsheet, namespace) {
   for (var i = 1; i < Object.keys(data).length; i++) {
     var course_id = data[i]["id"];
     var course_name = data[i]["name"]
-    if (course_name.startsWith(termCode)) {
+    if (course_name.includes("Homeroom")) {
+      //do nothing
+    } else if (course_name.startsWith(termCode)) {
       Logger.log(course_id);
       Logger.log(course_name);
       Logger.log("------------------------------")
@@ -140,13 +155,14 @@ function __main(options, spreadsheet, namespace) {
 
       s.deleteColumns(9, 18);
       var row = 3;
-      var url = "https://" + namespace + "/api/v1/courses/" + course_id + "/assignments?per_page=100"
+      var url = "https://" + namespace + ".instructure.com/api/v1/courses/" + course_id + "/assignments?per_page=100"
       var response = UrlFetchApp.fetch(url, options);
       var adata = JSON.parse(response.getContentText());
 
       for (var i1 = 1; i1 < adata.length; i1++) {
+        try{
         var assignment_id = adata[i1]["id"];
-        var submission_url = "https://" + namespace + "/api/v1/courses/" + course_id + "/assignments/" + assignment_id + "/submissions/self"
+        var submission_url = "https://" + namespace + ".instructure.com/api/v1/courses/" + course_id + "/assignments/" + assignment_id + "/submissions/self"
         var response = UrlFetchApp.fetch(submission_url, options);
         var sdata = JSON.parse(response.getContentText());
 
@@ -174,12 +190,16 @@ function __main(options, spreadsheet, namespace) {
         s.getRange('G' + row).setValue(assignment_submitted);
         s.getRange('G' + row).insertCheckboxes();
         row++
+        } catch {}
       }
 
-      var pagesurl = "https://" + namespace + "/api/v1/courses/" + course_id + "/pages?per_page=100"
+      var pagesurl = "https://" + namespace + ".instructure.com/api/v1/courses/" + course_id + "/pages?per_page=100"
+      try {
       var response = UrlFetchApp.fetch(pagesurl, options);
+      } catch {}
       var pages = JSON.parse(response.getContentText());
       for (var i2 = 1; i2 < pages.length; i2++) {
+        try{
         var page_id = pages[i2]["url"];
         var page_name = pages[i2]["title"]
         var page_due_at = "-"
@@ -194,6 +214,7 @@ function __main(options, spreadsheet, namespace) {
         s.getRange('F' + row).setValue("-");
         s.getRange('G' + row).setValue("-");
         row++
+        } catch {}
       }
       s.autoResizeColumns(2, s.getLastColumn());
       var columnsToAdjust = [4, 5, 6, 7];
@@ -206,10 +227,10 @@ function __main(options, spreadsheet, namespace) {
 
 
       // Calculate the first empty row based on assignments, pages, and 3
-      var totalRowsNeeded = adata.length + pages.length + 3;
+      var totalRowsNeeded = adata.length + pages.length + 1;
 
       // Get the first empty row
-      var firstEmptyRow = s.getLastRow() + 1;
+      var firstEmptyRow = totalRowsNeeded;
 
       // Set the background of the row below the first empty row to black
       s.getRange('A' + firstEmptyRow + ':G' + firstEmptyRow).setBackground('black');
@@ -222,11 +243,11 @@ function __main(options, spreadsheet, namespace) {
       applyAlternatingColors(s);
 
       overviewSheet.getRange("A" + rowIndex).setValue(course_name);
-      overviewSheet.getRange("B" + rowIndex).setFormula('=COUNTIF(\'' + course_name + '\'!$G$3:$G$' + (rowIndex + 2) + ', "TRUE")');
-      overviewSheet.getRange("C" + rowIndex).setFormula('=COUNTIF(\'' + course_name + '\'!$G$3:$G$' + (rowIndex + 2) + ', "FALSE")');
-      overviewSheet.getRange("D" + rowIndex).setFormula('=COUNTIFS(\'' + course_name + '\'!$G$3:$G$' + (rowIndex + 2) + ', FALSE, \'' + course_name + '\'!$C$3:$C$' + (rowIndex + 2) + ', ">"&(TODAY()+3))');
-      overviewSheet.getRange("E" + rowIndex).setFormula('=COUNTIFS(\'' + course_name + '\'!$G$3:$G$' + (rowIndex + 2) + ', FALSE, \'' + course_name + '\'!$C$3:$C$' + (rowIndex + 2) + ', ">="&(TODAY()+3)), \'' + course_name + '\'!$C$3:$C$' + (rowIndex + 2) + ', "<="&(TODAY()+7))');
-      overviewSheet.getRange("F" + rowIndex).setFormula('=COUNTIFS(\'' + course_name + '\'!$G$3:$G$' + (rowIndex + 2) + ', FALSE, \'' + course_name + '\'!$C$3:$C$' + (rowIndex + 2) + ', "<"&(TODAY()))');
+      overviewSheet.getRange("B" + rowIndex).setFormula('=COUNTIF(\'' + course_name + '\'!$G:$G, "TRUE")');
+      overviewSheet.getRange("C" + rowIndex).setFormula('=COUNTIF(\'' + course_name + '\'!$G:$G, "FALSE")');
+      overviewSheet.getRange("D" + rowIndex).setFormula('=COUNTIFS(\'' + course_name + '\'!$G:$G, "FALSE", \'' + course_name + '\'!$C:$C, "<"&(TODAY()+3))');
+      overviewSheet.getRange("E" + rowIndex).setFormula('=COUNTIFS(\'' + course_name + '\'!$G:$G, "FALSE", \'' + course_name + '\'!$C:$C, "<"&(TODAY()+7))');
+      overviewSheet.getRange("F" + rowIndex).setFormula('=COUNTIFS(\'' + course_name + '\'!$G:$G, "FALSE", \'' + course_name + '\'!$C:$C, "<"&(TODAY()))');
       totalRows++;
       rowIndex++;
 
