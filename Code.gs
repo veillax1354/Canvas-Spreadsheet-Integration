@@ -124,6 +124,7 @@ function __main(options, spreadsheet, namespace) {
       }
 
       var s = spreadsheet.insertSheet(course_name);
+      spreadsheet.toast("Refreshing " + course_name, "Refreshing Data")
 
       s.setColumnWidth(1, 21);
       s.setColumnWidth(8, 21);
@@ -179,7 +180,7 @@ function __main(options, spreadsheet, namespace) {
         }
         var assignment_type = adata[i1]["is_quiz_assignment"];
         s.getRange('A' + row).setValue(assignment_id);
-        s.getRange('B' + row).setValue(assignment_name);
+        s.getRange('B' + row).setFormula('=HYPERLINK("https://williamsburglearning.instructure.com/courses/' + course_id + '/assignments/' + assignment_id + '", "' + assignment_name + '")');
         s.getRange('C' + row).setValue(assignment_due_at);
         s.getRange('D' + row).setValue(assignment_submitted_at);
         s.getRange('E' + row).setValue(assignment_score);
@@ -192,6 +193,7 @@ function __main(options, spreadsheet, namespace) {
         row++
         } catch {}
       }
+      
 
       var pagesurl = "https://" + namespace + ".instructure.com/api/v1/courses/" + course_id + "/pages?per_page=100"
       try {
@@ -207,7 +209,7 @@ function __main(options, spreadsheet, namespace) {
           var page_due_at = formatdate(pages[i2]["todo_date"])
         }
         s.getRange('A' + row).setValue(page_id);
-        s.getRange('B' + row).setValue(page_name);
+        s.getRange('B' + row).setFormula('=HYPERLINK("https://williamsburglearning.instructure.com/courses/' + course_id + '/pages/' + page_id + '", "' + page_name + '")');
         s.getRange('C' + row).setValue(page_due_at);
         s.getRange('D' + row).setValue("-");
         s.getRange('E' + row).setValue("-");
@@ -242,7 +244,7 @@ function __main(options, spreadsheet, namespace) {
       createConditionalFormatRule(s);
       applyAlternatingColors(s);
 
-      overviewSheet.getRange("A" + rowIndex).setValue(course_name);
+      overviewSheet.getRange("A" + rowIndex).setFormula('=HYPERLINK("https://williamsburglearning.instructure.com/courses/' + course_id + '", "' + course_name + '")')
       overviewSheet.getRange("B" + rowIndex).setFormula('=COUNTIF(\'' + course_name + '\'!$G:$G, "TRUE")');
       overviewSheet.getRange("C" + rowIndex).setFormula('=COUNTIF(\'' + course_name + '\'!$G:$G, "FALSE")');
       overviewSheet.getRange("D" + rowIndex).setFormula('=COUNTIFS(\'' + course_name + '\'!$G:$G, "FALSE", \'' + course_name + '\'!$C:$C, "<"&(TODAY()+3))');
