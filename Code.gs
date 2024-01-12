@@ -1,31 +1,34 @@
-function formatdate(date) {
-  if (date) {
-    var originalDate = new Date(date);
-    if (!isNaN(originalDate.getTime())) {
-      return Utilities.formatDate(originalDate, 'GMT', 'MM/dd/yyyy');
+var Utils = {
+
+  formatdate: function(date) {
+    if (date) {
+      var originalDate = new Date(date);
+      if (!isNaN(originalDate.getTime())) {
+        return Utilities.formatDate(originalDate, 'GMT', 'MM/dd/yyyy');
+      }
     }
+    return "-";
+  },
+
+  createConditionalFormatRule: function(sheet) {
+    var range = sheet.getRange("B2:G" + (sheet.getMaxRows() - 1));
+    var rule = SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied("=AND($C2<TODAY(),$G2=FALSE)")
+      .setBackground("#EA9999")
+      .setRanges([range])
+      .build();
+    var rules = sheet.getConditionalFormatRules();
+    rules.push(rule);
+    sheet.setConditionalFormatRules(rules);
+  },
+
+  applyAlternatingColors: function(sheet) {
+    var range = sheet.getRange("B2:G" + (sheet.getMaxRows() - 1));
+    var banding = range.applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, false, false);
+    banding.setFirstRowColor("#FFFFFF");
+    banding.setSecondRowColor("#F3F3F3");
   }
-  return "-";
-}
-
-function createConditionalFormatRule(sheet) {
-  var range = sheet.getRange("B2:G" + (sheet.getMaxRows() - 1));
-  var rule = SpreadsheetApp.newConditionalFormatRule()
-    .whenFormulaSatisfied("=AND($C2<TODAY(),$G2=FALSE)")
-    .setBackground("#EA9999")
-    .setRanges([range])
-    .build();
-  var rules = sheet.getConditionalFormatRules();
-  rules.push(rule);
-  sheet.setConditionalFormatRules(rules);
-}
-
-function applyAlternatingColors(sheet) {
-  var range = sheet.getRange("B2:G" + (sheet.getMaxRows() - 1));
-  var banding = range.applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, false, false); // apply a default banding theme with no header and no footer
-  banding.setFirstRowColor("#FFFFFF"); // set the first row color to white
-  banding.setSecondRowColor("#F3F3F3"); // set the second row color to light grey
-}
+};
 
 function run(token, spreadsheet, namespace) {
   var headers = {
@@ -168,11 +171,11 @@ function __main(options, spreadsheet, namespace) {
         var sdata = JSON.parse(response.getContentText());
 
         var assignment_name = adata[i1]["name"];
-        var assignment_due_at = formatdate(adata[i1]["due_at"]);
+        var assignment_due_at = Utils.formatdate(adata[i1]["due_at"]);
         var assignment_worth = adata[i1]["points_possible"];
         var assignment_submitted = Boolean(adata[i1]["has_submitted_submissions"]);
         if (assignment_submitted) {
-          var assignment_submitted_at = formatdate(sdata["submitted_at"]);
+          var assignment_submitted_at = Utils.formatdate(sdata["submitted_at"]);
           var assignment_score = sdata["score"];
         } else {
           var assignment_submitted_at = "-";
@@ -206,7 +209,7 @@ function __main(options, spreadsheet, namespace) {
         var page_name = pages[i2]["title"]
         var page_due_at = "-"
         if (pages[i2]["todo_date"]) {
-          var page_due_at = formatdate(pages[i2]["todo_date"])
+          var page_due_at = Utils.formatdate(pages[i2]["todo_date"])
         }
         s.getRange('A' + row).setValue(page_id);
         s.getRange('B' + row).setFormula('=HYPERLINK("https://williamsburglearning.instructure.com/courses/' + course_id + '/pages/' + page_id + '", "' + page_name + '")');
@@ -241,8 +244,8 @@ function __main(options, spreadsheet, namespace) {
       if (firstEmptyRow > 0) {
         s.deleteRows(firstEmptyRow + 1, s.getMaxRows() - firstEmptyRow);
       }
-      createConditionalFormatRule(s);
-      applyAlternatingColors(s);
+      Utils.createConditionalFormatRule(s);
+      Utils.applyAlternatingColors(s);
 
       overviewSheet.getRange("A" + rowIndex).setFormula('=HYPERLINK("https://williamsburglearning.instructure.com/courses/' + course_id + '", "' + course_name + '")')
       overviewSheet.getRange("B" + rowIndex).setFormula('=COUNTIF(\'' + course_name + '\'!$G:$G, "TRUE")');
