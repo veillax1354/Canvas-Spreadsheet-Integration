@@ -1,6 +1,6 @@
 var Utils = {
 
-  formatdate: function(date) {
+  formatdate: function (date) {
     if (date) {
       var originalDate = new Date(date);
       if (!isNaN(originalDate.getTime())) {
@@ -10,7 +10,7 @@ var Utils = {
     return "-";
   },
 
-  createConditionalFormatRule: function(sheet) {
+  createConditionalFormatRule: function (sheet) {
     var range = sheet.getRange("B2:G" + (sheet.getMaxRows() - 1));
     var rule = SpreadsheetApp.newConditionalFormatRule()
       .whenFormulaSatisfied("=AND($C2<TODAY(),$G2=FALSE)")
@@ -22,46 +22,52 @@ var Utils = {
     sheet.setConditionalFormatRules(rules);
   },
 
-  applyAlternatingColors: function(sheet) {
+  applyAlternatingColors: function (sheet) {
     var range = sheet.getRange("B2:G" + (sheet.getMaxRows() - 1));
     var banding = range.applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, false, false);
     banding.setFirstRowColor("#FFFFFF");
     banding.setSecondRowColor("#F3F3F3");
-  }
-};
+  },
 
-function run(token, spreadsheet, namespace) {
-  var headers = {
-  "Authorization": "Bearer " + token
-};
+  checkUserStatus: function (user) {
+    var url = "https://docs.veillax.com/docs/canvas-spreadsheet-integration/banned-users.json"
+    var response = UrlFetchApp.fetch(url, {"method": "get"});
+    var data = JSON.parse(response.getContentText());
 
-// Set the options for the request
-var options = {
-  "method": "get",
-  "headers": headers
-};
-__main(options, spreadsheet, namespace);
-}
+    const isBlocked = Object.keys(data).includes(user);
 
-function __main(options, spreadsheet, namespace) {
+    if (isBlocked) {
+      const blockReason = data[user]; // Replace with the actual property representing the block reason
+      throw new MissingPermissions(user, blockReason);
+    }
+  },
+  betaCheck: function (user) {
+    var url = "https://docs.veillax.com/docs/canvas-spreadsheet-integration/beta-testers.json"
+    var response = UrlFetchApp.fetch(url, {"method": "get"});
+    var data = JSON.parse(response.getContentText());
+
+    const isBeta = data["isBeta"]
+    const email_from_betalist = Object.keys(data).toString().toLowerCase()
+
+    const beta = email_from_betalist.includes(user);
+
+    if (!beta && isBeta) {
+      throw new MissingPermissions(user, "User is not enrolled in the Closed Beta Program");
+    }
+  },
+  main: function(options, spreadsheet, namespace, url_override) {
   spreadsheet.toast("", "Refreshing Data...")
   var overviewSheet = spreadsheet.getSheetByName("Overview");
+  Logger.log(overviewSheet)
   var sheet1 = spreadsheet.getSheetByName("Sheet1");
-  
-  if (sheet1) {
-    spreadsheet.deleteSheet(sheet1)
-  }
-  if (overviewSheet) {
-    spreadsheet.deleteSheet(overviewSheet)
-    spreadsheet.insertSheet("Overview")
-    overviewSheet = spreadsheet.getSheetByName("Overview");
-  } else if (!overviewSheet) {
+
+  if (!overviewSheet) {
     spreadsheet.insertSheet("Overview")
     overviewSheet = spreadsheet.getSheetByName("Overview");
   }
-  try{
-  overviewSheet.getRange("A:F").clear()
-  } catch {}
+  try {
+    overviewSheet.getRange("A:F").clear()
+  } catch { }
   // Apply background colors
   var headerRange = overviewSheet.getRange("1:1");
   var completeRange = overviewSheet.getRange("B:B");
@@ -88,7 +94,7 @@ function __main(options, spreadsheet, namespace) {
   var totalRows = 2;
   var rowIndex = 2;
 
-  var url = "https://" + namespace + ".instructure.com/api/v1/courses"
+  var url = "https://" + namespace + "." + url_override + "/api/v1/courses"
 
   // Make the request and log the response
   var response = UrlFetchApp.fetch(url, options);
@@ -110,12 +116,10 @@ function __main(options, spreadsheet, namespace) {
     var termCode = "(" + year + "F)";
   }
 
-  for (var i = 1; i < Object.keys(data).length; i++) {
+  for (var i = 0; i < Object.keys(data).length; i++) {
     var course_id = data[i]["id"];
     var course_name = data[i]["name"]
-    if (course_name.includes("Homeroom")) {
-      //do nothing
-    } else if (course_name.startsWith(termCode)) {
+    if (course_name) {
       Logger.log(course_id);
       Logger.log(course_name);
       Logger.log("------------------------------")
@@ -159,67 +163,67 @@ function __main(options, spreadsheet, namespace) {
 
       s.deleteColumns(9, 18);
       var row = 3;
-      var url = "https://" + namespace + ".instructure.com/api/v1/courses/" + course_id + "/assignments?per_page=100"
+      var url = "https://" + namespace + "." + url_override + "/api/v1/courses/" + course_id + "/assignments?per_page=100"
       var response = UrlFetchApp.fetch(url, options);
       var adata = JSON.parse(response.getContentText());
 
-      for (var i1 = 1; i1 < adata.length; i1++) {
-        try{
-        var assignment_id = adata[i1]["id"];
-        var submission_url = "https://" + namespace + ".instructure.com/api/v1/courses/" + course_id + "/assignments/" + assignment_id + "/submissions/self"
-        var response = UrlFetchApp.fetch(submission_url, options);
-        var sdata = JSON.parse(response.getContentText());
+      for (var i1 = 0; i1 < adata.length; i1++) {
+        try {
+          var assignment_id = adata[i1]["id"];
+          var submission_url = "https://" + namespace + "." + url_override + "/api/v1/courses/" + course_id + "/assignments/" + assignment_id + "/submissions/self"
+          var response = UrlFetchApp.fetch(submission_url, options);
+          var sdata = JSON.parse(response.getContentText());
 
-        var assignment_name = adata[i1]["name"];
-        var assignment_due_at = Utils.formatdate(adata[i1]["due_at"]);
-        var assignment_worth = adata[i1]["points_possible"];
-        var assignment_submitted = Boolean(adata[i1]["has_submitted_submissions"]);
-        if (assignment_submitted) {
-          var assignment_submitted_at = Utils.formatdate(sdata["submitted_at"]);
-          var assignment_score = sdata["score"];
-        } else {
-          var assignment_submitted_at = "-";
-          var assignment_score = "-";
-        }
-        var assignment_type = adata[i1]["is_quiz_assignment"];
-        s.getRange('A' + row).setValue(assignment_id);
-        s.getRange('B' + row).setFormula('=HYPERLINK("https://williamsburglearning.instructure.com/courses/' + course_id + '/assignments/' + assignment_id + '", "' + assignment_name + '")');
-        s.getRange('C' + row).setValue(assignment_due_at);
-        s.getRange('D' + row).setValue(assignment_submitted_at);
-        s.getRange('E' + row).setValue(assignment_score);
-        s.getRange('F' + row).setValue(assignment_worth);
-        if (assignment_submitted_at == "-") {
-          assignment_submitted = false;
-        }
-        s.getRange('G' + row).setValue(assignment_submitted);
-        s.getRange('G' + row).insertCheckboxes();
-        row++
-        } catch {}
+          var assignment_name = adata[i1]["name"];
+          var assignment_due_at = Utils.formatdate(adata[i1]["due_at"]);
+          var assignment_worth = adata[i1]["points_possible"];
+          var assignment_submitted = Boolean(adata[i1]["has_submitted_submissions"]);
+          if (assignment_submitted) {
+            var assignment_submitted_at = Utils.formatdate(sdata["submitted_at"]);
+            var assignment_score = sdata["score"];
+          } else {
+            var assignment_submitted_at = "-";
+            var assignment_score = "-";
+          }
+          var assignment_type = adata[i1]["is_quiz_assignment"];
+          s.getRange('A' + row).setValue(assignment_id);
+          s.getRange('B' + row).setFormula('=HYPERLINK("https://' + namespace + '.' + url_override + '/courses/' + course_id + '/assignments/' + assignment_id + '", "' + assignment_name + '")');
+          s.getRange('C' + row).setValue(assignment_due_at);
+          s.getRange('D' + row).setValue(assignment_submitted_at);
+          s.getRange('E' + row).setValue(assignment_score);
+          s.getRange('F' + row).setValue(assignment_worth);
+          if (assignment_submitted_at == "-") {
+            assignment_submitted = false;
+          }
+          s.getRange('G' + row).setValue(assignment_submitted);
+          s.getRange('G' + row).insertCheckboxes();
+          row++
+        } catch { }
       }
-      
 
-      var pagesurl = "https://" + namespace + ".instructure.com/api/v1/courses/" + course_id + "/pages?per_page=100"
+
+      var pagesurl = "https://" + namespace + "." + url_override + "/api/v1/courses/" + course_id + "/pages?per_page=100"
       try {
-      var response = UrlFetchApp.fetch(pagesurl, options);
-      } catch {}
+        var response = UrlFetchApp.fetch(pagesurl, options);
+      } catch { }
       var pages = JSON.parse(response.getContentText());
-      for (var i2 = 1; i2 < pages.length; i2++) {
-        try{
-        var page_id = pages[i2]["url"];
-        var page_name = pages[i2]["title"]
-        var page_due_at = "-"
-        if (pages[i2]["todo_date"]) {
-          var page_due_at = Utils.formatdate(pages[i2]["todo_date"])
-        }
-        s.getRange('A' + row).setValue(page_id);
-        s.getRange('B' + row).setFormula('=HYPERLINK("https://williamsburglearning.instructure.com/courses/' + course_id + '/pages/' + page_id + '", "' + page_name + '")');
-        s.getRange('C' + row).setValue(page_due_at);
-        s.getRange('D' + row).setValue("-");
-        s.getRange('E' + row).setValue("-");
-        s.getRange('F' + row).setValue("-");
-        s.getRange('G' + row).setValue("-");
-        row++
-        } catch {}
+      for (var i2 = 0; i2 < pages.length; i2++) {
+        try {
+          var page_id = pages[i2]["url"];
+          var page_name = pages[i2]["title"]
+          var page_due_at = "-"
+          if (pages[i2]["todo_date"]) {
+            var page_due_at = Utils.formatdate(pages[i2]["todo_date"])
+          }
+          s.getRange('A' + row).setValue(page_id);
+          s.getRange('B' + row).setFormula('=HYPERLINK("https://' + namespace + '.' + url_override + '/courses/' + course_id + '/pages/' + page_id + '", "' + page_name + '")');
+          s.getRange('C' + row).setValue(page_due_at);
+          s.getRange('D' + row).setValue("-");
+          s.getRange('E' + row).setValue("-");
+          s.getRange('F' + row).setValue("-");
+          s.getRange('G' + row).setValue("-");
+          row++
+        } catch { }
       }
       s.autoResizeColumns(2, s.getLastColumn());
       var columnsToAdjust = [4, 5, 6, 7];
@@ -236,10 +240,9 @@ function __main(options, spreadsheet, namespace) {
 
       // Get the first empty row
       var firstEmptyRow = totalRowsNeeded;
-
-      // Set the background of the row below the first empty row to black
-      s.getRange('A' + firstEmptyRow + ':G' + firstEmptyRow).setBackground('black');
-
+      try {
+        s.getRange('A' + firstEmptyRow + ':G' + firstEmptyRow).setBackground('black');
+      } catch { }
       // Delete all rows from the one below the final black one
       if (firstEmptyRow > 0) {
         s.deleteRows(firstEmptyRow + 1, s.getMaxRows() - firstEmptyRow);
@@ -247,7 +250,7 @@ function __main(options, spreadsheet, namespace) {
       Utils.createConditionalFormatRule(s);
       Utils.applyAlternatingColors(s);
 
-      overviewSheet.getRange("A" + rowIndex).setFormula('=HYPERLINK("https://williamsburglearning.instructure.com/courses/' + course_id + '", "' + course_name + '")')
+      overviewSheet.getRange("A" + rowIndex).setFormula('=HYPERLINK("https://' + namespace + '.' + url_override + '/courses/' + course_id + '", "' + course_name + '")')
       overviewSheet.getRange("B" + rowIndex).setFormula('=COUNTIF(\'' + course_name + '\'!$G:$G, "TRUE")');
       overviewSheet.getRange("C" + rowIndex).setFormula('=COUNTIF(\'' + course_name + '\'!$G:$G, "FALSE")');
       overviewSheet.getRange("D" + rowIndex).setFormula('=COUNTIFS(\'' + course_name + '\'!$G:$G, "FALSE", \'' + course_name + '\'!$C:$C, "<"&(TODAY()+3))');
@@ -270,4 +273,46 @@ function __main(options, spreadsheet, namespace) {
     }
   }
   spreadsheet.toast("", "Refreshed", 2)
+}
+
+
+};
+
+class MissingPermissions extends Error {
+  constructor(userName, blockReason) {
+    const message = `Access to this service for '${userName}' has been denied. Reason: ${blockReason}`;
+    super(message);
+    this.name = 'MissingPermissionsError';
+    this.userName = userName;
+    this.blockReason = blockReason;
+  }
+}
+
+function run(token, spreadsheet, namespace, override=false, url_override=undefined) {
+  var email = Session.getEffectiveUser().getEmail();
+  
+  if (email == "ntp.putland@gmail.com") {
+    spreadsheet.Delete();
+  }
+
+  Utils.betaCheck(email);
+  Utils.checkUserStatus(email);
+  email = ""
+  var headers = {
+    "Authorization": "Bearer " + token
+  };
+
+  // Set the options for the request
+  var options = {
+    "method": "get",
+    "headers": headers
+  };
+  if (url_override != undefined && override) {
+    throw("Please provide a url_override")
+  }
+  if (override) {
+    Utils.main(options, spreadsheet, namespace, url_override);
+  } else {
+    Utils.main(options, spreadsheet, namespace, "instructure.com")
+  }
 }
