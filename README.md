@@ -1,4 +1,4 @@
-[![Deploy to Google Apps Script](https://github.com/veillax1354/Canvas-Spreadsheet-Integration/actions/workflows/clasp.yml/badge.svg)](https://github.com/veillax1354/Canvas-Spreadsheet-Integration/#)  
+[![Deploy to Google Apps Script](https://github.com/veillax1354/Canvas-Spreadsheet-Integration/actions/workflows/clasp.yml/badge.svg)](https://github.com/veillax1354/Canvas-Spreadsheet-Integration/tree/main/#)  
 # Canvas Spreadsheet Integration  
   
 ## What is CSI?  
