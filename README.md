@@ -1,5 +1,6 @@
-[![Deploy to Google Apps Script](https://github.com/veillax1354/Canvas-Spreadsheet-Integration/actions/workflows/clasp.yml/badge.svg)](https://github.com/veillax1354/Canvas-Spreadsheet-Integration/tree/main)  
-# Canvas Spreadsheet Integration  
+# This is currently not functional and will give you a lot of emails about failures and it will not work too well
+
+## Canvas Spreadsheet Integration  
   
 ## What is CSI?  
 CSI (Canvas Spreadsheet Integration) is a custom script designed for seamlessly retrieving Canvas data automatically. Initially developed to create an organized checklist for assignments and facilitate comprehensive tracking of due dates, CSI has evolved into a robust tool.
@@ -9,3 +10,4 @@ The script automates the retrieval and update of course-related information from
 Documentation:  
 [https://docs.veillax.com/docs/canvas-spreadsheet-integration
 ](https://docs.veillax.com/docs/canvas-spreadsheet-integration/)
+
